@@ -52,6 +52,13 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+    if(rank == 0) {
+        std::cout << "Running test command with args " << argv[1] << ", " << argv[2] << '\n';
+        std::cout << "There are " << size << " processes participating.\n";
+    }
+
+    std::cout << "Rank " << rank << " executing on "; system("hostname");
+
     const char* rootFileName = "%s/test.out.%02d";
     
     std::cout << "Rank " << rank << " is writing data out...\n";
@@ -67,20 +74,21 @@ int main(int argc, char** argv) {
     std::cout << "Rank " << rank << " write complete.\n";
 
     MPI_Barrier(MPI_COMM_WORLD);
+
     if(rank == 0) {
-        std::cout << "Rank " << rank << " is merging data to final output file \"" << argv[2] << "\"...\n";
         std::ofstream outFile{argv[2]};
         if(!outFile.good()) {
-            std::cerr << "test-llio.cpp: ERROR: Error opening output file \"" << argv[2] << "\"\n";
+            std::cerr << "test-llio.cpp: ERROR: Error opening output file \"" << argv[2] << '\"' << std::endl;
             perror("Perror Output:");
             return 1;
         }
 
+        std::cout << "Rank " << rank << " is merging data to final output file \"" << argv[2] << "\"...\n";
         for(int i = 0; i != size; ++i) {
             sprintf(fileName, rootFileName, argv[1], i);
             char buf[WRITE_SIZE];
             void* inData = mapFile(fileName, WRITE_SIZE, false);
-            if(inData == nullptr) continue;
+            if(inData == nullptr) { std::cerr << "Unable to map file \"" << fileName << "\"\n"; continue; }
             memcpy(buf, inData, WRITE_SIZE);
             std::cout << "Copying data from file \"" << fileName << "\" " << buf << '\n';
             outFile.seekp(i * WRITE_SIZE);
@@ -90,5 +98,6 @@ int main(int argc, char** argv) {
         std::cout << "Rank " << rank << " merge complete.\n";
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
     return 0;
 }
